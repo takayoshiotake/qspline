@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"><!-- ✅ あ keeps UTF-8 -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>spline2</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.3/Chart.bundle.min.js"></script>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<style>
+:root {
+    --background-color: rgba(255, 255, 255, 1);
+    --history-background-color: rgba(240, 240, 240, 1);
+    --primary-color: rgba(0, 32, 96, 1);
+    --spacing: 8px;
+}
+html, body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--background-color);
+}
+html {
+    overflow: hidden;
+}
+body {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+}
+* {
+    font-size: 14px;
+    color: rgba(0, 0, 0, 0.6);
+}
+#header-placer {
+    height: 32px;
+}
+#header {
+    position: fixed;
+
+    width: calc(100% - var(--spacing) * 2);
+    height: 32px;
+    padding-left: var(--spacing);
+    padding-right: var(--spacing);
+
+    display: flex;
+    align-items: center;
+
+    background-color: var(--primary-color);
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.6);
+}
+#header * {
+    color: rgba(255, 255, 255, 1);
+}
+#header .title {
+    font-size: 16px;
+    font-weight: bold;
+}
+#header i.material-icons {
+    font-size: 24px;
+    user-select: none;
+}
+#header i.button {
+    cursor: pointer;
+}
+#header .space {
+    flex-grow: 1;
+}
+#output-container {
+    margin: var(--spacing);
+    margin-bottom: 0;
+    width: calc(100% - var(--spacing) * 2);
+}
+#output-container:empty {
+    margin: 0;
+}
+#output-container * {
+    margin-top: var(--spacing);
+}
+#input-container {
+    margin: var(--spacing);
+    width: calc(100% - var(--spacing) * 2);
+}
+#points-input-text {
+    width: 100%;
+    height: 25vh;
+
+    box-sizing: border-box;
+    border: solid 1px rgba(0, 0, 0, 0.18);
+    resize: none;
+    outline: none;
+    color: rgba(0, 0, 0, 0.8);
+}
+.input-history {
+    margin-top: var(--spacing);
+}
+.input-history pre {
+    padding: 0;
+    padding-left: var(--spacing);
+    margin: 0;
+    background-color: var(--history-background-color);
+    border-left: 4px solid black;
+}
+a {
+    color: rgba(0, 0, 0, 0.4);
+    font-size: 12px;
+}
+</style>
+</head>
+<body>
+    <template id="input-history-view">
+        <div class="input-history">
+            <pre>{points}</pre>
+        </div>
+    </template>
+    <template id="output-message-view">
+        <div class="output-message">{message}</div>
+    </template>
+    <template id="output-graph-view">
+        <div class="output-graph">
+            <canvas></canvas>
+        </div>
+    </template>
+    <div id="header">
+        <p><span class="title">QUADRATIC SPLINE</span> v1.0.0</p>
+        <div class="space"></div>
+        <i id="clear-button" class="material-icons button">clear</i>
+    </div>
+    <div id="header-placer"></div>
+    <div id="output-container"></div>
+    <div id="input-container">
+        input points:
+        <textarea id="points-input-text"></textarea>
+        <button id="spline2-button">spline2 (ctrl+Enter)</button>
+        <br>
+        <br>
+        <a href="https://github.com/takayoshiotake/qspline">https://github.com/takayoshiotake/qspline</a>
+    </div>
+<script>
+let app = {}
+app.q1 = query => { return document.querySelector(query) }
+app.qn = query => { return document.querySelectorAll(query) }
+app.outputMessage = msg => {
+    let message = document.importNode(app.q1('#output-message-view').content, true)
+    message.querySelector('div').textContent = msg
+    app.q1('#output-container').appendChild(message)
+    document.body.scrollTop = document.body.scrollHeight
+}
+app.ouputSpline2Graph = points => {
+    let inputHistory = document.importNode(app.q1('#input-history-view').content, true)
+    inputHistory.querySelector('pre').textContent = points
+    app.q1('#output-container').appendChild(inputHistory)
+
+    // DEBUG
+    if (points == 'version') {
+        app.outputMessage(`v1.0.0`)
+        viewModel.input = ''
+        return
+    } else if (points == 'clear') {
+        app.q1('#output-container').textContent = ''
+        viewModel.input = ''
+        return
+    }
+
+    try {
+        points = points.split(/\r?\n/).map(line => {
+            var values = line.split(/,/)
+            if (values.length != 2) {
+                throw 'Illegal input'
+            }
+            values = values.map(x => {
+                let value = Number(x)
+                if (isNaN(value)) {
+                    throw `Illegal number: ${x}`
+                }
+                return value
+            })
+            return { x: values[0], y: values[1] }
+        })
+        let curves = app.spline2ForPoints(points)
+
+        let range = points[points.length - 1].x - points[0].x
+        let spline = []
+        for (let i = 0; i < 100; ++i) {
+            spline.push({x: points[0].x + i * range / 100})
+        }
+        spline.push({x: points[points.length - 1].x})
+        spline = spline.map(p => { return { x: p.x, y: curves.y(p.x) } })
+
+        let graph = document.importNode(app.q1('#output-graph-view').content, true)
+        let ctx = graph.querySelector('canvas')
+        ctx.width = 1440
+        ctx.height = 1080
+        let chart = new Chart(ctx, {
+            type: 'scatter',
+            data: {
+                datasets: [
+                    {
+                        data: points,
+                        label: 'input',
+                        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                        fill: false,
+                        pointBackgroundColor: 'transparent',
+                        pointBorderColor: 'rgba(0, 0, 0, 0.6)',
+                        pointBorderWidth: 1,
+                        pointRadius: 3,
+                        pointStyle: 'circle',
+                        showLine: false,
+                        animation: true
+                    },
+                    {
+                        data: spline,
+                        label: 'spline2',
+                        backgroundColor: 'rgba(0, 32, 96, 1)',
+                        borderColor: 'rgba(0, 32, 96, 1)',
+                        borderWidth: 2,
+                        fill: false,
+                        lineTension: 0,
+                        pointBorderWidth: 0,
+                        pointRadius: 0,
+                        showLine: true,
+                        animation: true
+                    }
+                ]
+            },
+            options:{
+                scales: {
+                },
+                responsive: true,
+                maintainAspectRatio: true
+            }
+        })
+        app.q1('#output-container').appendChild(graph)
+    } catch (e) {
+        app.outputMessage(`Error: ${e}`)
+    }
+    document.body.scrollTop = document.body.scrollHeight
+}
+app.spline2ForPoints = (points, opt_a0) => {
+    let S = []
+
+    if (points.length < 2) {
+        throw 'Illegal input'
+    }
+    for (let i = 0; i < points.length - 1; ++i) {
+        if (points[i].x >= points[i+1].x) {
+            throw 'Illegal x order'
+        }
+    }
+
+    let N = points.length - 1 // N + 1 points => N curves
+    // Prepare curves
+    for (let i = 0; i < N; ++i) {
+        S.push({
+            a: NaN,
+            b: NaN,
+            c: NaN,
+            xs: points[i].x,
+            xe: points[i+1].x
+        });
+    }
+    // c_i
+    for (let i = 0; i < N; ++i) {
+        S[i].c = points[i].y
+    }
+    // a_i
+    var a0
+    if (typeof opt_a0 != 'undefined') {
+        a0 = opt_a0
+    } else {
+        let Uc = 1
+        let Vc = 0
+        let Wc = 0
+        for (let i = 0; i < N; ++i) {
+            let Uj = 1
+            let Vj = 0
+            let Wj = 0
+            for (let j = i-1; j > 0; --j) {
+                // m => -1
+                let dxj_0_m = points[j].x - points[j-1].x
+                let dxj_1_0 = points[j+1].x - points[j].x
+                let dyj_0_m = points[j].y - points[j-1].y
+                let dyj_1_0 = points[j+1].y - points[j].y
+                let uj_m = - dxj_0_m / dxj_1_0
+                let vj_m = (dyj_1_0 / dxj_1_0 - dyj_0_m / dxj_0_m) / dxj_1_0
+
+                let Uj_m = Uj * (uj_m * uj_m)
+                let Vj_m = Uj * (2 * uj_m * vj_m) + Vj * (uj_m)
+                let Wj_m = Uj * (vj_m * vj_m) + Vj * (vj_m) + Wj
+                Uj = Uj_m
+                Vj = Vj_m
+                Wj = Wj_m
+            }
+            Uc += Uj
+            Vc += Vj
+            Wc += Wj
+        }
+        a0 = -Vc / (2 * Uc)
+    }
+    S[0].a = a0;
+    for (let i = 0; i < N-1; ++i) {
+        let dxi_1_0 = points[i+1].x - points[i].x
+        let dxi_2_1 = points[i+2].x - points[i+1].x
+        let dyi_1_0 = points[i+1].y - points[i].y
+        let dyi_2_1 = points[i+2].y - points[i+1].y
+        let ui = - dxi_1_0 / dxi_2_1
+        let vi = (dyi_2_1 / dxi_2_1 - dyi_1_0 / dxi_1_0) / dxi_2_1
+        // a_{i+1} = u_i a_i + v_i
+        S[i+1].a = ui * S[i].a + vi
+    }
+    // b_i
+    for (let i = 0; i < N; ++i) {
+        let dxi_1_0 = points[i+1].x - points[i].x
+        let dyi_1_0 = points[i+1].y - points[i].y
+        S[i].b = dyi_1_0 / dxi_1_0 - S[i].a * dxi_1_0
+    }
+
+    S.y = x => {
+        for (let curve of S) {
+            if (x >= curve.xs && x <= curve.xe) {
+                let nx = x - curve.xs
+                return curve.a * nx * nx + curve.b * nx + curve.c
+            }
+        }
+        return NaN
+    }
+
+    return S
+}
+
+let viewModel = {
+    _callbacks: {},
+    subscribe(name, callback) {
+        if (!(name in this._callbacks)) {
+            this._callbacks[name] = []
+        }
+        this._callbacks[name].push(callback)
+    },
+    _publish(name, val) {
+        if (name in this._callbacks) {
+            for (let callback of this._callbacks[name]) {
+                callback(val)
+            }
+        }
+    },
+
+    _input: '',
+    get input() { return this._input },
+    set input(val) {
+        this._input = val
+        this._publish('input', this._input)
+    },
+}
+
+document.addEventListener('keydown', event => {
+    if (event.ctrlKey && event.key.toLowerCase() == 'enter') {
+        app.ouputSpline2Graph(viewModel.input)
+    }
+})
+
+let _bindings = {
+    '#clear-button': it => {
+        it.onclick = e => {
+            app.q1('#output-container').textContent = ''
+        }
+    },
+    '#spline2-button': it => {
+        it.onclick = e => {
+            app.ouputSpline2Graph(viewModel.input)
+        }
+    },
+    '#points-input-text': it => {
+        viewModel.subscribe('input', val => {
+            it.value = val
+        })
+        it.addEventListener('input', e => {
+            viewModel.input = it.value
+        })
+    }
+}
+Object.keys(_bindings).forEach(key => {
+    _bindings[key](app.q1(key))
+})
+
+viewModel.input = String.raw`0,0
+10,20
+50,80
+100,100`
+</script>
+</body>
+</html>
