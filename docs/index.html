@@ -188,8 +188,8 @@ app.ouputSpline2Graph = points => {
 
         let graph = document.importNode(app.q1('#output-graph-view').content, true)
         let ctx = graph.querySelector('canvas')
-        ctx.width = 1440
-        ctx.height = 1080
+        ctx.width = 320
+        ctx.height = 240
         let chart = new Chart(ctx, {
             type: 'scatter',
             data: {
@@ -225,7 +225,7 @@ app.ouputSpline2Graph = points => {
             options:{
                 scales: {
                 },
-                responsive: true,
+                responsive: false,
                 maintainAspectRatio: true
             }
         })
