@@ -1,5 +1,7 @@
 # QUADRATIC SPLINE
 
+OTAKE Takayoshi, 2019-02-02
+
 ## Condition
 
 2次元の $n+1$ 個の点の列:
@@ -27,7 +29,7 @@ $$
 とする。
 
 
-## Resolution
+## Solution
 
 区間曲線は区間の端の点を通るため
 
