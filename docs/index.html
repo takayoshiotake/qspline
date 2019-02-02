@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"><!-- ✅ あ keeps UTF-8 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>spline2</title>
+<title>qspline</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.3/Chart.bundle.min.js"></script>
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 <style>
@@ -121,7 +121,7 @@ a {
         </div>
     </template>
     <div id="header">
-        <p><span class="title">QUADRATIC SPLINE</span> v1.0.0</p>
+        <p><span class="title">QUADRATIC SPLINE</span> v1.0.1</p>
         <div class="space"></div>
         <i id="clear-button" class="material-icons button">clear</i>
     </div>
@@ -130,7 +130,7 @@ a {
     <div id="input-container">
         input points:
         <textarea id="points-input-text"></textarea>
-        <button id="spline2-button">spline2 (ctrl+Enter)</button>
+        <button id="qspline-button">qspline (ctrl+Enter)</button>
         <br>
         <br>
         <a href="https://github.com/takayoshiotake/qspline">https://github.com/takayoshiotake/qspline</a>
@@ -145,7 +145,7 @@ app.outputMessage = msg => {
     app.q1('#output-container').appendChild(message)
     document.body.scrollTop = document.body.scrollHeight
 }
-app.ouputSpline2Graph = points => {
+app.ouputQSplineGraph = points => {
     let inputHistory = document.importNode(app.q1('#input-history-view').content, true)
     inputHistory.querySelector('pre').textContent = points
     app.q1('#output-container').appendChild(inputHistory)
@@ -176,7 +176,7 @@ app.ouputSpline2Graph = points => {
             })
             return { x: values[0], y: values[1] }
         })
-        let curves = app.spline2ForPoints(points)
+        let curves = app.qsplineForPoints(points)
 
         let range = points[points.length - 1].x - points[0].x
         let spline = []
@@ -209,7 +209,7 @@ app.ouputSpline2Graph = points => {
                     },
                     {
                         data: spline,
-                        label: 'spline2',
+                        label: 'qspline',
                         backgroundColor: 'rgba(0, 32, 96, 1)',
                         borderColor: 'rgba(0, 32, 96, 1)',
                         borderWidth: 2,
@@ -235,7 +235,7 @@ app.ouputSpline2Graph = points => {
     }
     document.body.scrollTop = document.body.scrollHeight
 }
-app.spline2ForPoints = (points, opt_a0) => {
+app.qsplineForPoints = (points, opt_a0) => {
     let S = []
 
     if (points.length < 2) {
@@ -353,7 +353,7 @@ let viewModel = {
 
 document.addEventListener('keydown', event => {
     if (event.ctrlKey && event.key.toLowerCase() == 'enter') {
-        app.ouputSpline2Graph(viewModel.input)
+        app.ouputQSplineGraph(viewModel.input)
     }
 })
 
@@ -363,9 +363,9 @@ let _bindings = {
             app.q1('#output-container').textContent = ''
         }
     },
-    '#spline2-button': it => {
+    '#qspline-button': it => {
         it.onclick = e => {
-            app.ouputSpline2Graph(viewModel.input)
+            app.ouputQSplineGraph(viewModel.input)
         }
     },
     '#points-input-text': it => {
