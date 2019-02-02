@@ -7,6 +7,9 @@
 #include <string>
 #include <fstream>
 
+// !!!: This is experimental; Usually this is 0.
+#define FREES_X_ORDER 0
+
 using number_t = float;
 const number_t NaN = std::numeric_limits<number_t>::quiet_NaN();
 
@@ -28,6 +31,7 @@ struct SectionCurve2 {
 static std::vector<Point2> read_points_from_csv_file(char const * path);
 static std::vector<SectionCurve2> qspline_for_points(std::vector<Point2> const & points, std::optional<number_t> opt_a0);
 static number_t y_on_qspline(std::vector<SectionCurve2> const & curves, number_t x);
+static number_t y_on_curve(SectionCurve2 const & curve, number_t x);
 
 int main(int argc, char ** argv) {
     if (argc < 2) {
@@ -48,11 +52,27 @@ int main(int argc, char ** argv) {
         auto const points = read_points_from_csv_file(argv[1]);
         auto const curves = qspline_for_points(points, opt_a0);
         // output
-        auto range = points.back().x - points.front().x;
-        for (auto x = points.front().x; x < points.back().x; x += range / 100) {
-            std::printf("%f,%f\n", x, y_on_qspline(curves, x));
+        if (FREES_X_ORDER) {
+            for (auto const & curve : curves) {
+                auto dx = (curve.xe - curve.xs) / 100;
+                if (dx > 0) {
+                    for (auto x = curve.xs; x < curve.xe; x += dx) {
+                        std::printf("%f,%f\n", x, y_on_curve(curve, x));
+                    }
+                } else {
+                    for (auto x = curve.xs; x > curve.xe; x += dx) {
+                        std::printf("%f,%f\n", x, y_on_curve(curve, x));
+                    }
+                }
+                std::printf("%f,%f\n", curve.xe, y_on_curve(curve, curve.xe));
+            }
+        } else {
+            auto range = points.back().x - points.front().x;
+            for (auto x = points.front().x; x < points.back().x; x += range / 100) {
+                std::printf("%f,%f\n", x, y_on_qspline(curves, x));
+            }
+            std::printf("%f,%f\n", points.back().x, y_on_qspline(curves, points.back().x));
         }
-        std::printf("%f,%f\n", points.back().x, y_on_qspline(curves, points.back().x));
     } catch (int & error) {
         std::printf("Error %d\n", error);
         return -1;
@@ -86,9 +106,17 @@ static std::vector<SectionCurve2> qspline_for_points(std::vector<Point2> const &
     if (!(points.size() >= 2)) {
         throw -__LINE__;
     }
-    for (auto i = 0; i < points.size() - 1; ++i) {
-        if (!(points[i].x < points[i+1].x)) {
-            throw -__LINE__;
+    if (FREES_X_ORDER) {
+        for (auto i = 0; i < points.size() - 1; ++i) {
+            if (!(points[i].x != points[i+1].x)) {
+                throw -__LINE__;
+            }
+        }
+    } else {
+        for (auto i = 0; i < points.size() - 1; ++i) {
+            if (!(points[i].x < points[i+1].x)) {
+                throw -__LINE__;
+            }
         }
     }
 
@@ -167,9 +195,13 @@ static std::vector<SectionCurve2> qspline_for_points(std::vector<Point2> const &
 static number_t y_on_qspline(std::vector<SectionCurve2> const & curves, number_t x) {
     for (auto curve: curves) {
         if (x >= curve.xs && x <= curve.xe) {
-            auto nx = x - curve.xs;
-            return curve.a * nx * nx + curve.b * nx + curve.c;
+            return y_on_curve(curve, x);
         }
     }
     return NaN;
+}
+
+static number_t y_on_curve(SectionCurve2 const & curve, number_t x) {
+    auto nx = x - curve.xs;
+    return curve.a * nx * nx + curve.b * nx + curve.c;
 }
